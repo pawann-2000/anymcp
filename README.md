@@ -251,3 +251,77 @@ The meta-server has access to all your MCP servers, so:
 The MCP Meta-Server transforms your collection of individual MCP servers into a cohesive, intelligent system. By providing usage analytics, performance optimization, and workflow capabilities, it enables you to work more efficiently and effectively with AI assistants like Cursor.
 
 Start with basic discovery and routing, then gradually explore advanced features like workflows and optimization as you become familiar with the system. The meta-server will learn from your usage patterns and continuously improve its performance over time.
+
+## CLI Usage
+
+After installing dependencies, you can start the **MCP Meta-Server** from anywhere with:
+
+```bash
+npx mcp-meta-server
+```
+
+or, if you have it linked globally:
+
+```bash
+mcp-meta-server
+```
+
+### Options
+
+| Flag | Description |
+|------|-------------|
+| `-c, --config <path>` | Path to a JSON file *or* a directory containing one or more `*.mcp.json` files. Those files describe where individual MCP servers live and how they should be started. |
+| `-l, --log-level <level>` | Log verbosity. One of `error`, `warn`, `info` (default) or `debug`. |
+| `--disable-dedup` | Disable the tool-deduplication layer completely. |
+| `--sim-threshold <number>` | Similarity threshold (0-1) used when grouping similar tools. |
+| `--auto-merge` | Automatically merge similar tools when deduplication is enabled. |
+| `-h, --help` | Show the help screen. |
+| `-V, --version` | Show the package version. |
+
+### Configuration file example
+
+```json
+{
+  "id": "local-demo-server",
+  "name": "Local Demo Server",
+  "command": ["node", "./demo-server/index.js"],
+  "description": "Example local MCP server"
+}
+```
+
+You can also pass an array of such objects:
+
+```json
+[
+  {
+    "id": "server-1",
+    "name": "First Server",
+    "command": ["python", "-m", "my_mcp_server"],
+    "description": "Python based implementation"
+  },
+  {
+    "id": "server-2",
+    "name": "Second Server",
+    "command": ["node", "/opt/other/server.js"]
+  }
+]
+```
+
+Keep the file anywhere and start the meta-server with:
+
+```bash
+mcp-meta-server --config path/to/mcp-config.json
+```
+
+---
+
+### Stopping the server
+
+Press `Ctrl + C` (SIGINT) or send a `SIGTERM` signal and the Meta-Server will gracefully disconnect from all child servers before exiting.
+
+---
+
+### Notes
+
+* If no configuration is supplied the discovery system will look for `*.mcp.json` or `mcp-config.json` files in the standard configuration directories for your operating system _(see `src/discovery.ts` for details)_.
+* You can still change advanced deduplication parameters at runtime by calling the built-in `configure_deduplication` tool.

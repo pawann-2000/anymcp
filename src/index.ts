@@ -1,4 +1,3 @@
-
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -14,6 +13,7 @@ import {
 import { MCPDiscoverySystem, MCPServerConfiguration } from './discovery.js';
 import { CachingSystem } from './caching.js';
 import { ToolDeduplicationSystem, MergedTool } from './deduplication.js';
+import { fileURLToPath } from 'url';
 
 export interface PerformanceMetrics {
   successRate: number;
@@ -943,4 +943,13 @@ async function main() {
   }
 }
 
-main().catch(console.error);
+// Execute main only when this file is run directly via `node dist/index.js`
+try {
+  const isDirectRun = process.argv[1] === fileURLToPath(import.meta.url);
+  if (isDirectRun) {
+    main().catch(console.error);
+  }
+} catch {
+  // Fallback for environments where import.meta is not available or errors occur
+  main().catch(console.error);
+}

@@ -1,0 +1,8 @@
+[
+  {
+    "id": "echo-server",
+    "name": "Echo Server",
+    "command": ["node", "-e", "console.log('hello')"],
+    "description": "Dummy server that prints hello"
+  }
+]
