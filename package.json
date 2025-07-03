@@ -1,0 +1,30 @@
+{
+    "name": "mcp-meta-server",
+    "version": "1.0.0",
+    "description": "MCP Meta-Server - Intelligent orchestration layer for Model Context Protocol servers",
+    "main": "dist/index.js",
+    "type": "module",
+    "scripts": {
+        "build": "tsc",
+        "start": "node dist/index.js",
+        "dev": "tsx src/index.ts",
+        "clean": "rm -rf dist",
+        "prepare": "npm run build"
+    },
+    "keywords": [
+        "mcp",
+        "model-context-protocol",
+        "orchestration",
+        "meta-server"
+    ],
+    "author": "",
+    "license": "MIT",
+    "dependencies": {
+        "@modelcontextprotocol/sdk": "^0.6.0"
+    },
+    "devDependencies": {
+        "@types/node": "^20.11.0",
+        "tsx": "^4.20.3",
+        "typescript": "^5.3.3"
+    }
+}
