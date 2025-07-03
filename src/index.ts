@@ -1,4 +1,3 @@
-
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -103,6 +102,11 @@ export class MCPMetaServer {
     }
 
     try {
+      // Security: Validate command before execution to prevent command injection
+      if (!this.isValidCommand(config.command)) {
+        throw new Error(`Invalid or potentially unsafe command configuration for server ${config.id}`);
+      }
+
       const serverInfo: ServerInfo = {
         config,
         client: new Client({
@@ -122,7 +126,8 @@ export class MCPMetaServer {
         status: 'connecting'
       };
 
-      const [command, ...args] = config.command;
+      // Security: Sanitize command and arguments
+      const [command, ...args] = config.command.map(arg => this.sanitizeCommandArgument(arg));
       const transport = new StdioClientTransport({
         command,
         args
@@ -161,6 +166,74 @@ export class MCPMetaServer {
       
       this.servers.set(config.id, serverInfo);
     }
+  }
+
+  // Security validation method for commands
+  private isValidCommand(command: string[]): boolean {
+    if (!Array.isArray(command) || command.length === 0) {
+      return false;
+    }
+
+    const [executable, ...args] = command;
+
+    // Check if executable is a string and not empty
+    if (typeof executable !== 'string' || executable.trim().length === 0) {
+      return false;
+    }
+
+    // Security: Block potentially dangerous commands and patterns
+    const dangerousPatterns = [
+      /[;&|`$(){}[\]]/,  // Shell metacharacters
+      /\.\./,            // Directory traversal
+      /^\/dev\//,        // Device files
+      /^\/proc\//,       // Process filesystem
+      /rm\s+-/,          // Dangerous rm commands
+      /sudo/,            // Privilege escalation
+      /su\s/,            // User switching
+      /chmod/,           // Permission changes
+      /chown/,           // Ownership changes
+    ];
+
+    // Check executable and all arguments for dangerous patterns
+    for (const pattern of dangerousPatterns) {
+      if (pattern.test(executable) || args.some(arg => typeof arg === 'string' && pattern.test(arg))) {
+        return false;
+      }
+    }
+
+    // Security: Only allow specific known safe executables for MCP servers
+    const allowedExecutables = [
+      'node',
+      'python',
+      'python3',
+      'npx',
+      'uv',
+      'pipx',
+      'deno',
+      'bun'
+    ];
+
+    const baseExecutable = executable.split('/').pop()?.split('\\').pop() || '';
+    
+    if (!allowedExecutables.includes(baseExecutable)) {
+      console.error(`Security: Blocked potentially unsafe executable: ${baseExecutable}`);
+      return false;
+    }
+
+    return true;
+  }
+
+  // Security sanitization method for command arguments
+  private sanitizeCommandArgument(arg: string): string {
+    if (typeof arg !== 'string') {
+      return String(arg);
+    }
+
+    // Remove or escape potentially dangerous characters
+    return arg
+      .replace(/[;&|`$(){}[\]]/g, '') // Remove shell metacharacters
+      .replace(/\.\./g, '')           // Remove directory traversal
+      .trim();
   }
 
   private async refreshToolsList() {

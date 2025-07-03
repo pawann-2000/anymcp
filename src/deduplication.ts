@@ -74,6 +74,11 @@ export class ToolDeduplicationSystem {
       return [];
     }
 
+    // Performance optimization: For large tool sets, use clustering approach
+    if (tools.length > 100) {
+      return this.mergeToolsWithClustering(tools);
+    }
+
     const merged: MergedTool[] = [];
     const processed = new Set<number>();
     
@@ -127,6 +132,116 @@ export class ToolDeduplicationSystem {
     }
     
     return merged;
+  }
+
+  // New optimized method for large tool sets
+  private mergeToolsWithClustering(tools: { serverId: string; tool: Tool }[]): MergedTool[] {
+    const merged: MergedTool[] = [];
+    const processed = new Set<number>();
+    
+    // Pre-group tools by name similarity for performance
+    const nameGroups = this.groupToolsByNameSimilarity(tools);
+    
+    for (const group of nameGroups) {
+      if (group.length === 1) {
+        // Single tool, convert to MergedTool format
+        const singleTool: MergedTool = {
+          ...group[0].tool,
+          originalTools: [group[0]],
+          confidence: 1.0,
+          serverId: group[0].serverId
+        };
+        merged.push(singleTool);
+        continue;
+      }
+      
+      // For tools in the same name group, do detailed similarity analysis
+      const subProcessed = new Set<number>();
+      
+      for (let i = 0; i < group.length; i++) {
+        if (subProcessed.has(i)) continue;
+        
+        const similarGroup = [group[i]];
+        const similarities: ToolSimilarity[] = [];
+        
+        // Only compare within the pre-filtered group
+        for (let j = i + 1; j < group.length; j++) {
+          if (subProcessed.has(j)) continue;
+          
+          const similarity = this.analyzeSimilarity(group[i].tool, group[j].tool);
+          if (similarity.score >= this.config.similarityThreshold) {
+            similarGroup.push(group[j]);
+            similarities.push(similarity);
+            subProcessed.add(j);
+          }
+        }
+        
+        subProcessed.add(i);
+        
+        if (similarGroup.length > 1) {
+          // Create merged tool
+          const bestTool = this.selectBestTool(similarGroup);
+          const confidence = similarities.length > 0 
+            ? similarities.reduce((sum, s) => sum + s.score, 0) / similarities.length
+            : 1.0;
+          
+          const mergedTool: MergedTool = {
+            ...bestTool.tool,
+            name: this.generateMergedName(similarGroup),
+            description: this.generateMergedDescription(similarGroup),
+            originalTools: similarGroup,
+            confidence,
+            serverId: bestTool.serverId
+          };
+          
+          merged.push(mergedTool);
+        } else {
+          // Single tool in this subgroup
+          const singleTool: MergedTool = {
+            ...similarGroup[0].tool,
+            originalTools: [similarGroup[0]],
+            confidence: 1.0,
+            serverId: similarGroup[0].serverId
+          };
+          merged.push(singleTool);
+        }
+      }
+    }
+    
+    return merged;
+  }
+
+  // Helper method to pre-group tools by name similarity
+  private groupToolsByNameSimilarity(tools: { serverId: string; tool: Tool }[]): Array<{ serverId: string; tool: Tool }[]> {
+    const groups: Array<{ serverId: string; tool: Tool }[]> = [];
+    const processed = new Set<number>();
+    
+    for (let i = 0; i < tools.length; i++) {
+      if (processed.has(i)) continue;
+      
+      const group = [tools[i]];
+      processed.add(i);
+      
+      // Fast name-based grouping (much cheaper than full similarity)
+      for (let j = i + 1; j < tools.length; j++) {
+        if (processed.has(j)) continue;
+        
+        const nameSimilarity = this.calculateStringSimilarity(
+          tools[i].tool.name, 
+          tools[j].tool.name
+        );
+        
+        // Lower threshold for initial grouping to reduce comparisons
+        if (nameSimilarity > 0.6) {
+          group.push(tools[j]);
+          processed.add(j);
+        }
+      }
+      
+      groups.push(group);
+    }
+    
+    return groups;
   }
 
   private calculateStringSimilarity(str1: string, str2: string): number {

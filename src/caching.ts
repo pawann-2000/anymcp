@@ -1,4 +1,3 @@
-
 interface CacheEntry {
   data: any;
   expiry: number;
@@ -25,6 +24,8 @@ export class CachingSystem {
   private totalRequests: number = 0;
   private totalHits: number = 0;
   
+  private toolTypeRequests: Map<string, number> = new Map();
+  
   private toolTypeTTL: Map<string, number> = new Map([
     ['filesystem', 60000],    // 1 minute for file operations
     ['database', 180000],     // 3 minutes for database queries
@@ -41,10 +42,17 @@ export class CachingSystem {
       entry.hitCount++;
       entry.lastAccess = new Date();
       this.totalHits++;
+      
+      const currentCount = this.toolTypeRequests.get(entry.toolType) || 0;
+      this.toolTypeRequests.set(entry.toolType, currentCount + 1);
+      
       return entry.data;
     }
     
     if (entry) {
+      const currentCount = this.toolTypeRequests.get(entry.toolType) || 0;
+      this.toolTypeRequests.set(entry.toolType, currentCount + 1);
+      
       this.cache.delete(key);
     }
     
@@ -189,6 +197,7 @@ export class CachingSystem {
     this.cache.clear();
     this.totalRequests = 0;
     this.totalHits = 0;
+    this.toolTypeRequests.clear();
   }
 
   public getToolTypeMetrics() {
@@ -206,7 +215,9 @@ export class CachingSystem {
     
     for (const [toolType, stats] of toolTypeStats) {
       stats.avgHitCount = stats.avgHitCount / stats.count;
-      stats.hitRate = stats.avgHitCount > 0 ? stats.avgHitCount / this.totalRequests : 0;
+      
+      const toolTypeRequestCount = this.toolTypeRequests.get(toolType) || 0;
+      stats.hitRate = toolTypeRequestCount > 0 ? stats.avgHitCount / toolTypeRequestCount : 0;
     }
     
     return Object.fromEntries(toolTypeStats);
